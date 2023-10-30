@@ -77,13 +77,13 @@ struct cbwcb {
 
 
 struct cbw {
-        u32 dCBWSignature;
-        u32 dCBWTag;
-        u32 dCBWDataTransferLength;
-        u8 bmCBWFlags;
-        u8 bCBWLUN;
-        u8 bCBWCBLength;
-        struct cbwcb CBWCB;
+        u32 dcbw_signature;
+        u32 dcbw_tag;
+        u32 dcbw_txlength;
+        u8 bmcbw_flags;
+        u8 bcbw_lun;
+        u8 bcbwcb_length;
+        u8 cbwcb[CBWCB_SIZE];
 };
 
 static void bulk_storage_delete(struct kref *kref)
@@ -100,6 +100,8 @@ static void bulk_storage_write_callback(struct urb *urb)
 {
         struct usb_bulk_storage *dev;
         unsigned long flags;
+
+        pr_info("bulk_storage: begin: bulk_storage_write_callback");
 
         dev = urb->context;
 
@@ -120,26 +122,28 @@ static void bulk_storage_write_callback(struct urb *urb)
         up(&dev->limit_sem);
 }
 
-static void make_inquiry_cbwcb(struct cbwcb *CBWCB)
+static void make_inquiry_cbwcb(u8 *u8pcbwcb)
 {
-        CBWCB->opecode = INQUIRY_OPCODE;
-        CBWCB->cmddt_evpd = CMDDT_EVPD_ZERO;
-        CBWCB->page_code = PAGE_CODE_ZERO;
-        CBWCB->allocation_length =  VERIFY_ALLCATION_LENGTH;
-        CBWCB->control = CBWCB_CONTROL;
+        struct cbwcb *pcbwcb;
+        pcbwcb = (struct cbwcb*)u8pcbwcb;
+        pcbwcb->opecode = INQUIRY_OPCODE;
+        pcbwcb->cmddt_evpd = CMDDT_EVPD_ZERO;
+        pcbwcb->page_code = PAGE_CODE_ZERO;
+        pcbwcb->allocation_length =  VERIFY_ALLCATION_LENGTH;
+        pcbwcb->control = CBWCB_CONTROL;
 }
 
 static void make_inquiry_cbw(char *buf) {
-        struct cbw *cbw;
-        cbw = (struct cbw*)buf;
+        struct cbw *pcbw;
+        pcbw = (struct cbw*)buf;
         
-        cbw->dCBWSignature = DCBWSIGNATURE;
-        cbw->dCBWTag = DCBWTAG_VERIFY;
-        cbw->dCBWDataTransferLength = DCBW_VERIFY_DATA;
-        cbw->bmCBWFlags = BCBW_FLAG_IN;
-        cbw->bCBWLUN = BCBW_LUN;
-        cbw->bCBWCBLength = BCBW_VERIFY_COM_LENGTH;
-        make_inquiry_cbwcb(&cbw->CBWCB);
+        pcbw->dcbw_signature = DCBWSIGNATURE;
+        pcbw->dcbw_tag = DCBWTAG_VERIFY;
+        pcbw->dcbw_txlength = DCBW_VERIFY_DATA;
+        pcbw->bmcbw_flags = BCBW_FLAG_IN;
+        pcbw->bcbw_lun = BCBW_LUN;
+        pcbw->bcbwcb_length = BCBW_VERIFY_COM_LENGTH;
+        make_inquiry_cbwcb(pcbw->cbwcb);
 }
 
 static ssize_t send_inquiry(struct usb_bulk_storage *dev, struct file *file)
@@ -148,6 +152,8 @@ static ssize_t send_inquiry(struct usb_bulk_storage *dev, struct file *file)
         struct urb *urb = NULL;
         char *buf = NULL;
         size_t writesize = CBW_SIZE;
+
+        pr_info("bulk_storage: begin: send_inquiry");
 
         if (!(file->f_flags & O_NONBLOCK)) {
                 if (down_interruptible(&dev->limit_sem)) {
@@ -167,7 +173,7 @@ static ssize_t send_inquiry(struct usb_bulk_storage *dev, struct file *file)
                 dev->errors = 0;
                 retval = (retval == -EPIPE) ? retval : -EIO;
         }
-        spin_lock_irq(&dev->err_lock);
+        spin_unlock_irq(&dev->err_lock);
         if (retval < 0)
                 goto error;
 
@@ -230,6 +236,7 @@ static void bulk_storage_read_callback(struct urb *urb)
         struct usb_bulk_storage *dev;
         unsigned long flags;
 
+        pr_info("bulk_storage: begin: bulk_storage_read_callback");
         dev = urb->context;
 
         spin_lock_irqsave(&dev->err_lock, flags);
@@ -244,14 +251,18 @@ static void bulk_storage_read_callback(struct urb *urb)
         } else {
                 dev->bulk_in_filled = urb->actual_length;
         }
+        pr_info("bulk_storage: end: bulk_storage_read_callback");
         dev->ongoing_read = 0;
         spin_unlock_irqrestore(&dev->err_lock, flags);
         wake_up_interruptible(&dev->bulk_in_wait);
 }
 
-static ssize_t do_read_io(struct usb_bulk_storage *dev, size_t count)
+static ssize_t bulk_do_read_io(struct usb_bulk_storage *dev, size_t count)
 {
         int rv;
+
+        
+        pr_info("bulk_storage: begin: bulk_do_read_io");
 
         usb_fill_bulk_urb(dev->bulk_in_urb,
                           dev->udev,
@@ -281,10 +292,12 @@ static ssize_t do_read_io(struct usb_bulk_storage *dev, size_t count)
         return rv;
 }
 
-static ssize_t do_read(struct usb_bulk_storage *dev, struct file *file, char *buffer, size_t count)
+static ssize_t bulk_do_read(struct usb_bulk_storage *dev, struct file *file, char *buffer, size_t count)
 {
         int rv;
         bool ongoing_io;
+
+        pr_info("bulk_storage: begin: bulk_do_read");
 
         rv = mutex_lock_interruptible(&dev->io_mutex);
         if (rv < 0)
@@ -332,7 +345,7 @@ static ssize_t do_read(struct usb_bulk_storage *dev, struct file *file, char *bu
                         goto exit;
         }
         
-        rv = do_read_io(dev, count);
+        rv = bulk_do_read_io(dev, count);
         if (rv < 0)
                 goto exit;
 
@@ -349,12 +362,14 @@ exit:
 
 static ssize_t read_body(struct usb_bulk_storage *dev, struct file *file, char *buffer)
 {
-        return do_read(dev, file, buffer, INQUIRY_BODY);
+        pr_info("bulk_storage: begin: read_body");
+        return bulk_do_read(dev, file, buffer, INQUIRY_BODY);
 }
 
 static ssize_t read_csw(struct usb_bulk_storage *dev, struct file *file, char *buffer)
 {
-        return do_read(dev, file, buffer + CSW_BUF_OFFSET, CSW_SIZE);
+        pr_info("bulk_storage: begin: read_csw");
+        return bulk_do_read(dev, file, buffer + CSW_BUF_OFFSET, CSW_SIZE);
 }
 
 static ssize_t bulk_storage_read(struct file *file, char *buffer, size_t count,
@@ -362,6 +377,8 @@ static ssize_t bulk_storage_read(struct file *file, char *buffer, size_t count,
 {
         struct usb_bulk_storage *dev = file->private_data;
         int retval;
+        
+        pr_info("bulk_storage: begin: bulk_storage_read");
 
         if (count < 0x200) {
                 retval = -ESIZE;
@@ -372,6 +389,8 @@ static ssize_t bulk_storage_read(struct file *file, char *buffer, size_t count,
         retval = read_body(dev, file, buffer);
         retval = read_csw(dev, file, buffer + CSW_BUF_OFFSET);
 
+        pr_info("bulk_storage: end: bulk_storage_read");
+
 exit:
         return retval;
 }
@@ -379,8 +398,9 @@ exit:
 static ssize_t bulk_storage_write(struct file *file, const char *user_buffer,
                                    size_t count, loff_t *ppos)
 {
+        pr_info("bulk_storage: begin: bulk_storage_write");
         pr_info("bulk_storage: write is not implemented yet");
-        return 0x10;
+        return count;
 }
 
 static int bulk_storage_open(struct inode *inode, struct file *file)
@@ -389,6 +409,8 @@ static int bulk_storage_open(struct inode *inode, struct file *file)
         struct usb_interface  *interface;
         int subminor;
         int retval = 0;
+
+        pr_info("bulk_storage: begin: bulk_storage_open");
 
         subminor = iminor(inode);
 
@@ -439,6 +461,7 @@ static const struct file_operations bulk_storage_fops = {
         .write =        bulk_storage_write,
         .open =         bulk_storage_open,
         .release =      bulk_storage_release,
+        .llseek =       noop_llseek,
 };
 
 struct usb_class_driver bulk_storage_class = {
