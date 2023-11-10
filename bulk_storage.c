@@ -50,6 +50,7 @@ struct usb_bulk_storage {
         struct usb_interface    *interface;
         struct semaphore        limit_sem;
         struct usb_anchor       submitted;
+        int                     bulk_in_pipe;
         struct urb              *bulk_in_urb;
         unsigned char           *bulk_in_buffer;
         size_t                  bulk_in_size;
@@ -104,6 +105,11 @@ struct cbw {
         u8 bcbwcb_length;
         u8 cbwcb[CBWCB_SIZE];
 };
+
+static void setup_pipe(struct usb_bulk_storage *dev, struct file *file)
+{
+        dev->bulk_in_pipe = usb_rcvbulkpipe(dev->udev, dev->bulk_in_endpointAddr);
+}
 
 static void bulk_storage_delete(struct kref *kref)
 {
@@ -321,7 +327,7 @@ static ssize_t bulk_do_read_io(struct usb_bulk_storage *dev, size_t count)
 
         usb_fill_bulk_urb(dev->bulk_in_urb,
                           dev->udev,
-                          usb_rcvbulkpipe(dev->udev, dev->bulk_in_endpointAddr),
+                          dev->bulk_in_pipe,
                           dev->bulk_in_buffer,
                           min(dev->bulk_in_size, count),
                           bulk_storage_read_callback,
@@ -441,6 +447,8 @@ static ssize_t bulk_storage_read(struct file *file, char *buffer, size_t count,
                 retval = -ESIZE;
                 goto exit;
         }
+
+        setup_pipe(dev, file);
 
         retval = send_inquiry(dev, file);
         pr_info("bulk_storage: After send_inquiry;");
