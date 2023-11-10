@@ -25,7 +25,7 @@
 #define ESIZE 1
 #define CSW_BUF_OFFSET 0x500
 
-#define DCBWSIGNATURE 0x53425355
+#define DCBWSIGNATURE 0x43425355
 #define DCBWTAG_VERIFY 0
 #define DCBW_VERIFY_DATA 0x60
 #define BCBW_FLAG_IN (1 << 7)
@@ -42,7 +42,7 @@
 #define BMREQUEST_TYPE   0b00100001
 #define BREQUEST        0b11111111
 #define WVALUE          0
-#define WINDEX          0       // interface number; bit7 0 (in or out)
+#define WINDEX          (1 << 7)       // interface number; bit7 0 (in or out)
 #define WLENGTH         0
 
 struct usb_bulk_storage {
@@ -202,6 +202,7 @@ static ssize_t bulk_send_cmd(struct usb_bulk_storage *dev, struct file *file, si
         struct urb *urb = NULL;
         char *buf = NULL;
 
+        pr_info("bulk_storage: bigin: bulk_send_cmd");
         if (!(file->f_flags & O_NONBLOCK)) {
                 if (down_interruptible(&dev->limit_sem)) {
                         retval = -ERESTARTSYS;
@@ -288,6 +289,7 @@ static ssize_t send_inquiry(struct usb_bulk_storage *dev, struct file *file)
 static ssize_t send_reset(struct usb_bulk_storage *dev, struct file *file)
 {
         int retval;
+        pr_info("bulk_storage: send_reset");
         retval = bulk_send_cmd(dev, file, RESET_SIZE, RESET_CMD);
         return retval;
 }
@@ -443,19 +445,19 @@ static ssize_t bulk_storage_read(struct file *file, char *buffer, size_t count,
         
         pr_info("bulk_storage: begin: bulk_storage_read");
 
-        if (count < 0x1000) {
-                retval = -ESIZE;
-                goto exit;
-        }
+//        if (count < 0x1000) {
+//                retval = -ESIZE;
+//                goto exit;
+//        }
 
         setup_pipe(dev, file);
 
         retval = send_inquiry(dev, file);
-        pr_info("bulk_storage: After send_inquiry;");
+        pr_info("bulk_storage: After send_inquiry; retval=%d", retval);
         retval = read_body(dev, file, buffer);
-        pr_info("bulk_storage: After read_body;");
-        retval = read_csw(dev, file, buffer);
-        pr_info("bulk_storage: After read_csw;");
+        pr_info("bulk_storage: After read_body; retval=%d", retval);
+//        retval = read_csw(dev, file, buffer);
+        pr_info("bulk_storage: After read_csw; retval=%d", retval);
 
         pr_info("bulk_storage: end: bulk_storage_read");
 
