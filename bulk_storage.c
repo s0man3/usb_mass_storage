@@ -20,7 +20,7 @@
 #define CMD_SIZE_RESET          0x8
 
 #define CBW_SIZE                0x1F
-#define CBWCB_SIZE              0x10
+#define CMD_INQUIRY_CBWCB_SIZE  0x10
 #define CSW_SIZE                0x0D
 
 #define CBW_SIGNATURE           0x43425355
@@ -100,7 +100,7 @@ struct cbw {
         u8 bmcbw_flags;
         u8 bcbw_lun;
         u8 bcbwcb_length;
-        u8 cbwcb[CBWCB_SIZE];
+        u8 cbwcb[CMD_INQUIRY_CBWCB_SIZE];
 };
 
 static void bulk_storage_delete(struct kref *kref)
