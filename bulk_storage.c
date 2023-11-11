@@ -40,7 +40,7 @@
 #define CMD_RESET_TYPE          0b00100001
 #define CMD_RESET_REQUEST       0b11111111
 #define CMD_RESET_VALUE         0
-#define CMD_RESET_INDEX         (1 << 7)       // interface number; bit7 0 (in or out)
+#define CMD_RESET_INDEX_IN      (1 << 7)
 #define CMD_RESET_LENGTH        0
 
 struct usb_bulk_storage {
@@ -48,7 +48,6 @@ struct usb_bulk_storage {
         struct usb_interface    *interface;
         struct semaphore        limit_sem;
         struct usb_anchor       submitted;
-        int                     bulk_in_pipe;
         struct urb              *bulk_in_urb;
         unsigned char           *bulk_in_buffer;
         size_t                  bulk_in_size;
@@ -103,11 +102,6 @@ struct cbw {
         u8 bcbwcb_length;
         u8 cbwcb[CBWCB_SIZE];
 };
-
-static void setup_pipe(struct usb_bulk_storage *dev, struct file *file)
-{
-        dev->bulk_in_pipe = usb_rcvbulkpipe(dev->udev, dev->bulk_in_endpointAddr);
-}
 
 static void bulk_storage_delete(struct kref *kref)
 {
@@ -177,7 +171,7 @@ static void make_reset(char *buf) {
         preset->bmrequest_type = CMD_RESET_TYPE;
         preset->brequest = CMD_RESET_REQUEST;
         preset->wvalue = CMD_RESET_VALUE;
-        preset->windex = CMD_RESET_INDEX;
+        preset->windex = CMD_RESET_INDEX_IN;
         preset->wlength = CMD_RESET_LENGTH;
 }
 
@@ -326,7 +320,7 @@ static ssize_t bulk_in_rcv_io(struct usb_bulk_storage *dev, size_t count)
 
         usb_fill_bulk_urb(dev->bulk_in_urb,
                           dev->udev,
-                          dev->bulk_in_pipe,
+                          usb_rcvbulkpipe(dev->udev, dev->bulk_in_endpointAddr),
                           dev->bulk_in_buffer,
                           min(dev->bulk_in_size, count),
                           bulk_storage_read_callback,
@@ -430,7 +424,6 @@ static ssize_t bulk_storage_read(struct file *file, char *buffer, size_t count,
         struct usb_bulk_storage *dev = file->private_data;
         int retval = 0;
         
-        setup_pipe(dev, file);
         pr_info("bulk_storage: dev->bulk_in_size = 0x%lx", dev->bulk_in_size);
 exit:
         return retval;
