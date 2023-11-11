@@ -7,43 +7,41 @@
 #include <linux/kref.h>
 #include <linux/slab.h>
 
-#define USB_VENDOR_ID   0x174c
-#define USB_PRODUCT_ID  0x1153
-#define MINOR_BASE      192
-
-#define INQUIRY_CMD 1
-#define RESET_CMD 2
-#define RESET_SIZE 0x8
-
-#define CBW_SIZE        0x1F
-#define CBWCB_SIZE      0x10
-#define CSW_SIZE        0x0D
-
+#define USB_VENDOR_ID           0x174c
+#define USB_PRODUCT_ID          0x1153
+#define MINOR_BASE              192
 #define MAX_TRANSFER            (PAGE_SIZE - 512)
 #define WRITES_IN_FLIGHT        8
+#define ESIZE                   1
+#define CSW_BUF_OFFSET          0x500
 
-#define ESIZE 1
-#define CSW_BUF_OFFSET 0x500
+#define CMD_NUM_INQUIRY         1
+#define CMD_NUM_RESET           2
+#define CMD_SIZE_RESET          0x8
 
-#define DCBWSIGNATURE 0x43425355
-#define DCBWTAG_VERIFY 0
-#define DCBW_VERIFY_DATA 0x60
-#define BCBW_FLAG_IN (1 << 7)
-#define BCBW_LUN 0
-#define BCBW_VERIFY_COM_LENGTH 0x6
+#define CBW_SIZE                0x1F
+#define CBWCB_SIZE              0x10
+#define CSW_SIZE                0x0D
 
-#define INQUIRY_OPCODE 0x12
-#define CMDDT_EVPD_ZERO 0
-#define PAGE_CODE_ZERO 0
-#define VERIFY_ALLCATION_LENGTH_H 0x5
-#define VERIFY_ALLOCATION_LENGTH_L 0
-#define CBWCB_CONTROL 0
+#define CBW_SIGNATURE           0x43425355
+#define CBW_CMD_VERIFY_TAG      0
+#define CBW_CMD_VERIFY_DATA     0x60
+#define CBW_FLAG_IN             (1 << 7)
+#define CBW_LUN                 0
+#define CBW_CMD_VERIFY_CMDLEN   0x6
 
-#define BMREQUEST_TYPE   0b00100001
-#define BREQUEST        0b11111111
-#define WVALUE          0
-#define WINDEX          (1 << 7)       // interface number; bit7 0 (in or out)
-#define WLENGTH         0
+#define CMD_INQUIRY_OPCODE      0x12
+#define CMD_INQUIRY_CE_ZERO     0
+#define CMD_INQUIRY_PC_ZERO     0
+#define CMD_INQUIRY_AL_H        0x5
+#define CMD_INQUIRY_AL_L        0
+#define CMD_INQUIRY_CONT        0
+
+#define CMD_RESET_TYPE          0b00100001
+#define CMD_RESET_REQUEST       0b11111111
+#define CMD_RESET_VALUE         0
+#define CMD_RESET_INDEX         (1 << 7)       // interface number; bit7 0 (in or out)
+#define CMD_RESET_LENGTH        0
 
 struct usb_bulk_storage {
         struct usb_device       *udev;
@@ -152,45 +150,45 @@ static void make_inquiry_cbwcb(u8 *u8pcbwcb)
 {
         struct cbwcb *pcbwcb;
         pcbwcb = (struct cbwcb*)u8pcbwcb;
-        pcbwcb->opecode = INQUIRY_OPCODE;
-        pcbwcb->cmddt_evpd = CMDDT_EVPD_ZERO;
-        pcbwcb->page_code = PAGE_CODE_ZERO;
-        pcbwcb->allocation_length_h = VERIFY_ALLCATION_LENGTH_H;
-        pcbwcb->allocation_length_l = VERIFY_ALLOCATION_LENGTH_L;
-        pcbwcb->control = CBWCB_CONTROL;
+        pcbwcb->opecode = CMD_INQUIRY_OPCODE;
+        pcbwcb->cmddt_evpd = CMD_INQUIRY_CE_ZERO;
+        pcbwcb->page_code = CMD_INQUIRY_PC_ZERO;
+        pcbwcb->allocation_length_h = CMD_INQUIRY_AL_H;
+        pcbwcb->allocation_length_l = CMD_INQUIRY_AL_L;
+        pcbwcb->control = CMD_INQUIRY_CONT;
 }
 
 static void make_inquiry_cbw(char *buf) {
         struct cbw *pcbw;
         pcbw = (struct cbw*)buf;
         
-        pcbw->dcbw_signature = DCBWSIGNATURE;
-        pcbw->dcbw_tag = DCBWTAG_VERIFY;
-        pcbw->dcbw_txlength = DCBW_VERIFY_DATA;
-        pcbw->bmcbw_flags = BCBW_FLAG_IN;
-        pcbw->bcbw_lun = BCBW_LUN;
-        pcbw->bcbwcb_length = BCBW_VERIFY_COM_LENGTH;
+        pcbw->dcbw_signature = CBW_SIGNATURE;
+        pcbw->dcbw_tag = CBW_CMD_VERIFY_TAG;
+        pcbw->dcbw_txlength = CBW_CMD_VERIFY_DATA;
+        pcbw->bmcbw_flags = CBW_FLAG_IN;
+        pcbw->bcbw_lun = CBW_LUN;
+        pcbw->bcbwcb_length = CBW_CMD_VERIFY_CMDLEN;
         make_inquiry_cbwcb(pcbw->cbwcb);
 }
 
 static void make_reset(char *buf) {
         struct reset *preset;
         preset = (struct reset*)buf;
-        preset->bmrequest_type = BMREQUEST_TYPE;
-        preset->brequest = BREQUEST;
-        preset->wvalue = WVALUE;
-        preset->windex = WINDEX;
-        preset->wlength = WLENGTH;
+        preset->bmrequest_type = CMD_RESET_TYPE;
+        preset->brequest = CMD_RESET_REQUEST;
+        preset->wvalue = CMD_RESET_VALUE;
+        preset->windex = CMD_RESET_INDEX;
+        preset->wlength = CMD_RESET_LENGTH;
 }
 
 
 static void make_cmd_buf(char *buf, int cmd)
 {
         switch(cmd) {
-                case INQUIRY_CMD:
+                case CMD_NUM_INQUIRY:
                         make_inquiry_cbw(buf);
                         break;
-                case RESET_CMD:
+                case CMD_NUM_RESET:
                         make_reset(buf);
                         break;
         }
@@ -199,10 +197,10 @@ static void make_cmd_buf(char *buf, int cmd)
 static size_t get_size(int cmd)
 {
         switch(cmd) {
-                case INQUIRY_CMD:
+                case CMD_NUM_INQUIRY:
                         return CBW_SIZE;
-                case RESET_CMD:
-                        return RESET_SIZE;
+                case CMD_NUM_RESET:
+                        return CMD_SIZE_RESET;
         }
         return -1;
 }
