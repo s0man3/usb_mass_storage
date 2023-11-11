@@ -140,7 +140,7 @@ static void bulk_storage_write_callback(struct urb *urb)
         pr_info("bulk_storage: end: bulk_storage_write_callback");
 }
 
-static void make_inquiry_cbwcb(u8 *u8pcbwcb)
+static void cmd_inquiry_cbwcb(u8 *u8pcbwcb)
 {
         struct cbwcb *pcbwcb;
         pcbwcb = (struct cbwcb*)u8pcbwcb;
@@ -152,7 +152,7 @@ static void make_inquiry_cbwcb(u8 *u8pcbwcb)
         pcbwcb->control = CMD_INQUIRY_CONT;
 }
 
-static void make_inquiry_cbw(char *buf) {
+static void cmd_inquiry_fill(char *buf) {
         struct cbw *pcbw;
         pcbw = (struct cbw*)buf;
         
@@ -162,10 +162,10 @@ static void make_inquiry_cbw(char *buf) {
         pcbw->bmcbw_flags = CBW_FLAG_IN;
         pcbw->bcbw_lun = CBW_LUN;
         pcbw->bcbwcb_length = CBW_CMD_VERIFY_CMDLEN;
-        make_inquiry_cbwcb(pcbw->cbwcb);
+        cmd_inquiry_cbwcb(pcbw->cbwcb);
 }
 
-static void make_reset(char *buf) {
+static void cmd_reset_fill(char *buf) {
         struct reset *preset;
         preset = (struct reset*)buf;
         preset->bmrequest_type = CMD_RESET_TYPE;
@@ -176,19 +176,19 @@ static void make_reset(char *buf) {
 }
 
 
-static void make_cmd_buf(char *buf, int cmd)
+static void cmd_fill_buf(char *buf, int cmd)
 {
         switch(cmd) {
                 case CMD_NUM_INQUIRY:
-                        make_inquiry_cbw(buf);
+                        cmd_inquiry_fill(buf);
                         break;
                 case CMD_NUM_RESET:
-                        make_reset(buf);
+                        cmd_reset_fill(buf);
                         break;
         }
 }
 
-static size_t get_size(int cmd)
+static size_t cmd_get_size(int cmd)
 {
         switch(cmd) {
                 case CMD_NUM_INQUIRY:
@@ -208,7 +208,7 @@ static ssize_t bulk_out_snd(struct usb_bulk_storage *dev, struct file *file, int
 
         pr_info("bulk_storage: bigin: bulk_out_snd");
 
-        writesize = get_size(cmd);
+        writesize = cmd_get_size(cmd);
         if (!(file->f_flags & O_NONBLOCK)) {
                 if (down_interruptible(&dev->limit_sem)) {
                         retval = -ERESTARTSYS;
@@ -251,7 +251,7 @@ static ssize_t bulk_out_snd(struct usb_bulk_storage *dev, struct file *file, int
                 goto error;
         }
 
-        make_cmd_buf(buf, cmd);
+        cmd_fill_buf(buf, cmd);
 
         usb_fill_bulk_urb(urb, dev->udev,
                           usb_sndbulkpipe(dev->udev, dev->bulk_out_endpointAddr),
