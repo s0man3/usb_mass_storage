@@ -7,8 +7,8 @@
 #include <linux/kref.h>
 #include <linux/slab.h>
 
-#define READ_BYTE_SIZE			0x200
-#define SECTOR_SIZE				0x200
+#define READ_BYTE_SIZE		0x200
+#define SECTOR_SIZE             0x200
 
 #define USB_VENDOR_ID           0x174c
 #define USB_PRODUCT_ID          0x1153
@@ -24,7 +24,7 @@
 #define CMD_SIZE_RESET          0x8
 
 #define CBW_SIZE                0x1F
-#define CBWCB_MAXSIZE   		0x10
+#define CBWCB_MAXSIZE   	0x10
 #define CSW_SIZE                0x0D
 
 #define CBW_SIGNATURE           0x43425355
