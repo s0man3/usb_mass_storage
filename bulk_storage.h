@@ -112,6 +112,19 @@ struct cbwcb_read {
 		u8 control;
 };
 
+struct cbwcb_write {
+		u8 opecode;
+		u8 wrprotect;
+		u8 lba_h;
+		u8 lba_mh;
+		u8 lba_ml;
+		u8 lba_l;
+		u8 gnum;
+		u8 txlength_h;
+		u8 txlength_l;
+		u8 control;
+};
+
 struct cbw {
         u32 signature;
         u32 tag;
