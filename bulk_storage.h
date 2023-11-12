@@ -8,6 +8,7 @@
 #include <linux/slab.h>
 
 #define READ_BYTE_SIZE		0x200
+#define WRITE_BYTE_SIZE         0x200
 #define SECTOR_SIZE             0x200
 
 #define USB_VENDOR_ID           0x174c
@@ -21,6 +22,7 @@
 #define CMD_INQUIRY		0x1
 #define CMD_RESET		0x2
 #define CMD_READ		0x3
+#define CMD_WRITE               0x4
 #define CMD_SIZE_RESET          0x8
 
 #define CBW_SIZE                0x1F
@@ -40,6 +42,10 @@
 #define CBW_CMD_READ_TXLENGTH	READ_BYTE_SIZE
 #define CBW_CMD_READ_CMDLEN 	0x0A
 
+#define CBW_CMD_WRITE_TAG       0
+#define CBW_CMD_WRITE_TXLENGTH  WRITE_BYTE_SIZE
+#define CBW_CMD_WRITE_CMDLEN    0x0A
+
 #define CMD_INQUIRY_OPCODE      0x12
 #define CMD_INQUIRY_CE_ZERO     0
 #define CMD_INQUIRY_PC_ZERO     0
@@ -47,18 +53,25 @@
 #define CMD_INQUIRY_AL_L        0x4C
 #define CMD_INQUIRY_CONTROL     0
 
-#define CMD_RESET_TYPE          0b00100001
-#define CMD_RESET_REQUEST       0b11111111
-#define CMD_RESET_VALUE         0
-#define CMD_RESET_INDEX_IN      (1 << 7)
-#define CMD_RESET_LENGTH        0
-
 #define CMD_READ_OPCODE		0x28
 #define CMD_READ_RDPROTECT	0
 #define CMD_READ_GNUM		0
 #define CMD_READ_TXLENGTH_H	0
 #define CMD_READ_TXLENGTH_L	(READ_BYTE_SIZE / SECTOR_SIZE)
 #define CMD_READ_CONTROL	0
+
+#define CMD_WRITE_OPCODE        0x2A
+#define CMD_WRITE_WRPROTECT     0
+#define CMD_WRITE_GNUM          0
+#define CMD_WRITE_TXLENGTH_H    0
+#define CMD_WRITE_TXLENGTH_L    (WRITE_BYTE_SIZE / SECTOR_SIZE)
+#define CMD_WRITE_CONTROL       0
+
+#define CMD_RESET_TYPE          0b00100001
+#define CMD_RESET_REQUEST       0b11111111
+#define CMD_RESET_VALUE         0
+#define CMD_RESET_INDEX_IN      (1 << 7)
+#define CMD_RESET_LENGTH        0
 
 struct usb_bulk_storage {
         struct usb_device       *udev;
