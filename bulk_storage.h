@@ -21,7 +21,7 @@
 #define CMD_SIZE_RESET          0x8
 
 #define CBW_SIZE                0x1F
-#define CBWCB_MAXSIZE  		0x10
+#define CBWCB_MAXSIZE   		0x10
 #define CSW_SIZE                0x0D
 
 #define CBW_SIGNATURE           0x43425355
@@ -32,9 +32,9 @@
 #define CBW_CMD_INQUIRY_TXLENGTH	0x4C
 #define CBW_CMD_INQUIRY_CMDLEN  	0x6
 
-#define CBW_CMD_READ_TAG	0
-#define CBW_CMD_READ_TXLENGTH	0x1000
-#define CBW_CMD_READ_CMDLEN	0x0A
+#define CBW_CMD_READ_TAG    	0
+#define CBW_CMD_READ_TXLENGTH	0x200
+#define CBW_CMD_READ_CMDLEN 	0x0A
 
 #define CMD_INQUIRY_OPCODE      0x12
 #define CMD_INQUIRY_CE_ZERO     0
@@ -53,7 +53,7 @@
 #define CMD_READ_RDPROTECT	0
 #define CMD_READ_GNUM		0
 #define CMD_READ_TXLENGTH_H	0
-#define CMD_READ_TXLENGTH_L	0x8
+#define CMD_READ_TXLENGTH_L	0x1
 #define CMD_READ_CONTROL	0
 
 struct usb_bulk_storage {
@@ -97,15 +97,16 @@ struct cbwcb_inquiry {
 };
 
 struct cbwcb_read {
-    	u8 opecode;
-	u8 rdprotect;
-	u8 lba_h;
-	u8 lba_m;
-	u8 lba_l;
-	u8 gnum;
-	u8 txlength_h;
-	u8 txlength_l;
-	u8 control;
+		u8 opecode;
+		u8 rdprotect;
+		u8 lba_h;
+		u8 lba_mh;
+		u8 lba_ml;
+		u8 lba_l;
+		u8 gnum;
+		u8 txlength_h;
+		u8 txlength_l;
+		u8 control;
 };
 
 struct cbw {

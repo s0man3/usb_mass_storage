@@ -10,7 +10,8 @@ static const struct usb_device_id bulk_storage_idtable[] = {
 MODULE_DEVICE_TABLE(usb, bulk_storage_idtable);
 
 u8 lbaseek_h = 0;
-u8 lbaseek_m = 0;
+u8 lbaseek_mh = 0;
+u8 lbaseek_ml = 0;
 u8 lbaseek_l = 0; 
 
 static void bulk_storage_delete(struct kref *kref)
@@ -69,7 +70,8 @@ static void cmd_read_cbwcb(char *buf)
         pcbwcb->opecode = CMD_READ_OPCODE;
         pcbwcb->rdprotect = CMD_READ_RDPROTECT;
         pcbwcb->lba_h = lbaseek_h;
-        pcbwcb->lba_m = lbaseek_m;
+        pcbwcb->lba_mh = lbaseek_mh;
+        pcbwcb->lba_ml = lbaseek_ml;
         pcbwcb->lba_l = lbaseek_l;
         pcbwcb->gnum = CMD_READ_GNUM;
         pcbwcb->txlength_h = CMD_READ_TXLENGTH_H;
@@ -369,8 +371,20 @@ static ssize_t bulk_storage_read(struct file *file, char *buffer, size_t count,
 {
         struct usb_bulk_storage *dev = file->private_data;
         int retval = 0;
+
+        if (count < 0x1000) {
+                pr_info("bulk_storage: too small buffer length: 0x%x", (unsigned int)count);
+                retval = -ESIZE;
+                goto exit;
+        }
         
         pr_info("bulk_storage: dev->bulk_in_size = 0x%lx", dev->bulk_in_size);
+
+        retval = bulk_out_snd(dev, file, CMD_READ);
+        retval = bulk_in_rcv(dev, file, buffer, CBW_CMD_READ_TXLENGTH);
+        retval = bulk_in_rcv(dev, file, buffer + 0x1000 - 0x100, CSW_SIZE);
+
+        pr_info("bulk_storage: end, retval = %d", retval);
 exit:
         return retval;
 }
