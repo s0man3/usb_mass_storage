@@ -29,8 +29,6 @@ static void bulk_storage_write_callback(struct urb *urb)
         struct usb_bulk_storage *dev;
         unsigned long flags;
 
-        pr_info("bulk_storage: begin: bulk_storage_write_callback");
-
         dev = urb->context;
 
         if (urb->status) {
@@ -48,7 +46,6 @@ static void bulk_storage_write_callback(struct urb *urb)
         usb_free_coherent(urb->dev, urb->transfer_buffer_length,
                         urb->transfer_buffer, urb->transfer_dma);
         up(&dev->limit_sem);
-        pr_info("bulk_storage: end: bulk_storage_write_callback");
 }
 
 static void cmd_inquiry_cbwcb(u8 *buf)
@@ -154,8 +151,6 @@ static ssize_t bulk_out_snd(struct usb_bulk_storage *dev, struct file *file, int
         char *buf = NULL;
         size_t writesize;
 
-        pr_info("bulk_storage: bigin: bulk_out_snd");
-
         writesize = cmd_get_size(cmd);
         if (!(file->f_flags & O_NONBLOCK)) {
                 if (down_interruptible(&dev->limit_sem)) {
@@ -238,7 +233,6 @@ static void bulk_storage_read_callback(struct urb *urb)
         struct usb_bulk_storage *dev;
         unsigned long flags;
 
-        pr_info("bulk_storage: begin: bulk_storage_read_callback");
         dev = urb->context;
 
         spin_lock_irqsave(&dev->err_lock, flags);
@@ -253,7 +247,6 @@ static void bulk_storage_read_callback(struct urb *urb)
         } else {
                 dev->bulk_in_filled = urb->actual_length;
         }
-        pr_info("bulk_storage: end: bulk_storage_read_callback");
         dev->ongoing_read = 0;
         spin_unlock_irqrestore(&dev->err_lock, flags);
         wake_up_interruptible(&dev->bulk_in_wait);
@@ -262,9 +255,6 @@ static void bulk_storage_read_callback(struct urb *urb)
 static ssize_t bulk_in_rcv_io(struct usb_bulk_storage *dev, size_t count)
 {
         int rv;
-
-        
-        pr_info("bulk_storage: begin: bulk_in_rcv_io");
 
         usb_fill_bulk_urb(dev->bulk_in_urb,
                           dev->udev,
@@ -291,9 +281,6 @@ static ssize_t bulk_in_rcv_io(struct usb_bulk_storage *dev, size_t count)
                 spin_unlock_irq(&dev->err_lock);
         }
 
-
-        pr_info("bulk_storage: end: bulk_in_rcv_io");
-
         return rv;
 }
 
@@ -301,8 +288,6 @@ static ssize_t bulk_in_rcv(struct usb_bulk_storage *dev, struct file *file, char
 {
         int rv;
         bool ongoing_io;
-
-        pr_info("bulk_storage: begin: bulk_in_rcv");
 
         rv = mutex_lock_interruptible(&dev->io_mutex);
         if (rv < 0)
@@ -361,7 +346,6 @@ static ssize_t bulk_in_rcv(struct usb_bulk_storage *dev, struct file *file, char
         
 exit:
         mutex_unlock(&dev->io_mutex);
-        pr_info("bulk_storage: end: bulk_in_rcv");
         return rv;
 }
 
@@ -371,6 +355,14 @@ static ssize_t bulk_storage_read(struct file *file, char *buffer, size_t count,
 {
         struct usb_bulk_storage *dev = file->private_data;
         int retval = 0;
+        char *buf_csw;
+
+        buf_csw = kmalloc(CSW_SIZE, GFP_KERNEL);
+        if (buf_csw == NULL) {
+                retval = -1;
+                goto exit;
+        }
+
 
         if (count < 0x1000) {
                 pr_info("bulk_storage: too small buffer length: 0x%x", (unsigned int)count);
@@ -378,13 +370,11 @@ static ssize_t bulk_storage_read(struct file *file, char *buffer, size_t count,
                 goto exit;
         }
         
-        pr_info("bulk_storage: dev->bulk_in_size = 0x%lx", dev->bulk_in_size);
-
         retval = bulk_out_snd(dev, file, CMD_READ);
         retval = bulk_in_rcv(dev, file, buffer, CBW_CMD_READ_TXLENGTH);
-        retval = bulk_in_rcv(dev, file, buffer + 0x1000 - 0x100, CSW_SIZE);
+        retval = bulk_in_rcv(dev, file, buf_csw, CSW_SIZE);
 
-        pr_info("bulk_storage: end, retval = %d", retval);
+        kfree(buf_csw);
 exit:
         return retval;
 }
