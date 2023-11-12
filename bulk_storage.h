@@ -6,6 +6,7 @@
 #include <linux/mutex.h>
 #include <linux/kref.h>
 #include <linux/slab.h>
+#include <linux/string.h>
 
 #define READ_BYTE_SIZE		0x200
 #define WRITE_BYTE_SIZE         0x200
@@ -23,6 +24,7 @@
 #define CMD_RESET		0x2
 #define CMD_READ		0x3
 #define CMD_WRITE               0x4
+#define CMD_SNDDATA             0x5
 #define CMD_SIZE_RESET          0x8
 
 #define CBW_SIZE                0x1F

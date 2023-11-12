@@ -14,6 +14,8 @@ u8 lbaseek_mh = 0;
 u8 lbaseek_ml = 0;
 u8 lbaseek_l = 0; 
 
+char *write_buffer = NULL;
+
 static void bulk_storage_delete(struct kref *kref)
 {
         struct usb_bulk_storage *dev = to_usa_dev(kref);
@@ -76,6 +78,22 @@ static void cmd_read_cbwcb(char *buf)
         pcbwcb->control = CMD_READ_CONTROL;
 }
 
+static void cmd_write_cbwcb(char *buf)
+{
+        struct cbwcb_write *pcbwcb;
+        pcbwcb = (struct cbwcb_write*)buf;
+        pcbwcb->opecode = CMD_WRITE_OPCODE;
+        pcbwcb->wrprotect = CMD_WRITE_WRPROTECT;
+        pcbwcb->lba_h = lbaseek_h;
+        pcbwcb->lba_mh = lbaseek_mh;
+        pcbwcb->lba_ml = lbaseek_ml;
+        pcbwcb->lba_l = lbaseek_l;
+        pcbwcb->gnum = CMD_WRITE_GNUM;
+        pcbwcb->txlength_h = CMD_WRITE_TXLENGTH_H;
+        pcbwcb->txlength_l = CMD_WRITE_TXLENGTH_L;
+        pcbwcb->control = CMD_WRITE_CONTROL;
+}
+
 static void cmd_inquiry_fill(char *buf)
 {
         struct cbw *pcbw;
@@ -115,6 +133,25 @@ static void cmd_read_fill(char *buf)
         cmd_read_cbwcb(pcbw->cbwcb);
 }
 
+static void cmd_write_fill(char *buf)
+{
+        struct cbw *pcbw;
+        pcbw = (struct cbw*)buf;
+
+        pcbw->signature = CBW_SIGNATURE;
+        pcbw->tag = CBW_CMD_WRITE_TAG;
+        pcbw->txlength = CBW_CMD_WRITE_TXLENGTH;
+        pcbw->flags = CBW_FLAG_OUT;
+        pcbw->lun = CBW_LUN;
+        pcbw->cbwcb_length = CBW_CMD_READ_CMDLEN;
+        cmd_write_cbwcb(pcbw->cbwcb);
+}
+
+static void cmd_snddata_fill(char *buf)
+{
+        memcpy(buf, write_buffer, WRITE_BYTE_SIZE);
+}
+
 
 static void cmd_fill_buf(char *buf, int cmd)
 {
@@ -128,6 +165,12 @@ static void cmd_fill_buf(char *buf, int cmd)
                 case CMD_READ:
                         cmd_read_fill(buf);
                         break;
+                case CMD_WRITE:
+                        cmd_write_fill(buf);
+                        break;
+                case CMD_SNDDATA:
+                        cmd_snddata_fill(buf);
+                        break;
         }
 }
 
@@ -140,6 +183,10 @@ static size_t cmd_get_size(int cmd)
                         return CMD_SIZE_RESET;
                 case CMD_READ:
                         return CBW_SIZE;
+                case CMD_WRITE:
+                        return CBW_SIZE;
+                case CMD_SNDDATA:
+                        return WRITE_BYTE_SIZE;
         }
         return -1;
 }
@@ -381,7 +428,46 @@ exit:
 static ssize_t bulk_storage_write(struct file *file, const char *user_buffer,
                                    size_t count, loff_t *ppos)
 {
-        pr_info("bulk_storage: write is not implemented yet");
+        struct usb_bulk_storage *dev = file->private_data;
+        int retval = 0;
+        char *buf_csw;
+
+        write_buffer = NULL;
+
+        write_buffer = kmalloc(count, GFP_KERNEL);
+        if (write_buffer == NULL) {
+                retval = -1;
+                goto exit;
+        }
+
+        buf_csw = kmalloc(CSW_SIZE, GFP_KERNEL);
+        if (buf_csw == NULL) {
+                retval = -1;
+                kfree(write_buffer);
+                goto exit;
+        }
+
+        if (count < WRITE_BYTE_SIZE) {
+                pr_info("bulk_storage: too small buffer length: 0x%x", (unsigned int)count);
+                retval = -ESIZE;
+                goto exit;
+        }
+
+        if (copy_from_user(write_buffer, user_buffer, count)) {
+                retval = -EFAULT;
+                kfree(write_buffer);
+                kfree(buf_csw);
+                goto exit;
+        }
+
+
+        retval = bulk_out_snd(dev, file, CMD_WRITE);
+        retval = bulk_out_snd(dev, file, CMD_SNDDATA);
+        retval = bulk_in_rcv(dev, file, buf_csw, CSW_SIZE);
+
+        kfree(write_buffer);
+        kfree(buf_csw);
+exit:
         return count;
 }
 
