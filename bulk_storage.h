@@ -29,6 +29,7 @@
 
 #define CBW_SIGNATURE           0x43425355
 #define CBW_FLAG_IN             (1 << 7)
+#define CBW_FLAG_OUT            0
 #define CBW_LUN                 0
 
 #define CBW_CMD_INQUIRY_TAG     	0
