@@ -9,6 +9,10 @@ static const struct usb_device_id bulk_storage_idtable[] = {
 };
 MODULE_DEVICE_TABLE(usb, bulk_storage_idtable);
 
+u8 lbaseek_h = 0;
+u8 lbaseek_m = 0;
+u8 lbaseek_l = 0; 
+
 static void bulk_storage_delete(struct kref *kref)
 {
         struct usb_bulk_storage *dev = to_usa_dev(kref);
@@ -46,50 +50,84 @@ static void bulk_storage_write_callback(struct urb *urb)
         pr_info("bulk_storage: end: bulk_storage_write_callback");
 }
 
-static void cmd_inquiry_cbwcb(u8 *u8pcbwcb)
+static void cmd_inquiry_cbwcb(u8 *buf)
 {
-        struct cbwcb *pcbwcb;
-        pcbwcb = (struct cbwcb*)u8pcbwcb;
+        struct cbwcb_inquiry *pcbwcb;
+        pcbwcb = (struct cbwcb_inquiry*)buf;
         pcbwcb->opecode = CMD_INQUIRY_OPCODE;
         pcbwcb->cmddt_evpd = CMD_INQUIRY_CE_ZERO;
         pcbwcb->page_code = CMD_INQUIRY_PC_ZERO;
         pcbwcb->allocation_length_h = CMD_INQUIRY_AL_H;
         pcbwcb->allocation_length_l = CMD_INQUIRY_AL_L;
-        pcbwcb->control = CMD_INQUIRY_CONT;
+        pcbwcb->control = CMD_INQUIRY_CONTROL;
 }
 
-static void cmd_inquiry_fill(char *buf) {
+static void cmd_read_cbwcb(char *buf)
+{
+        struct cbwcb_read *pcbwcb;
+        pcbwcb = (struct cbwcb_read*)buf;
+        pcbwcb->opecode = CMD_READ_OPCODE;
+        pcbwcb->rdprotect = CMD_READ_RDPROTECT;
+        pcbwcb->lba_h = lbaseek_h;
+        pcbwcb->lba_m = lbaseek_m;
+        pcbwcb->lba_l = lbaseek_l;
+        pcbwcb->gnum = CMD_READ_GNUM;
+        pcbwcb->txlength_h = CMD_READ_TXLENGTH_H;
+        pcbwcb->txlength_l = CMD_READ_TXLENGTH_L;
+        pcbwcb->control = CMD_READ_CONTROL;
+}
+
+static void cmd_inquiry_fill(char *buf)
+{
         struct cbw *pcbw;
         pcbw = (struct cbw*)buf;
         
-        pcbw->dcbw_signature = CBW_SIGNATURE;
-        pcbw->dcbw_tag = CBW_CMD_VERIFY_TAG;
-        pcbw->dcbw_txlength = CBW_CMD_VERIFY_DATA;
-        pcbw->bmcbw_flags = CBW_FLAG_IN;
-        pcbw->bcbw_lun = CBW_LUN;
-        pcbw->bcbwcb_length = CBW_CMD_VERIFY_CMDLEN;
+        pcbw->signature = CBW_SIGNATURE;
+        pcbw->tag = CBW_CMD_INQUIRY_TAG;
+        pcbw->txlength = CBW_CMD_INQUIRY_TXLENGTH;
+        pcbw->flags = CBW_FLAG_IN;
+        pcbw->lun = CBW_LUN;
+        pcbw->cbwcb_length = CBW_CMD_INQUIRY_CMDLEN;
         cmd_inquiry_cbwcb(pcbw->cbwcb);
 }
 
-static void cmd_reset_fill(char *buf) {
+static void cmd_reset_fill(char *buf)
+{
         struct reset *preset;
         preset = (struct reset*)buf;
-        preset->bmrequest_type = CMD_RESET_TYPE;
-        preset->brequest = CMD_RESET_REQUEST;
-        preset->wvalue = CMD_RESET_VALUE;
-        preset->windex = CMD_RESET_INDEX_IN;
-        preset->wlength = CMD_RESET_LENGTH;
+        preset->request_type = CMD_RESET_TYPE;
+        preset->request = CMD_RESET_REQUEST;
+        preset->value = CMD_RESET_VALUE;
+        preset->index = CMD_RESET_INDEX_IN;
+        preset->length = CMD_RESET_LENGTH;
+}
+
+static void cmd_read_fill(char *buf)
+{
+        struct cbw *pcbw;
+        pcbw = (struct cbw*)buf;
+        
+        pcbw->signature = CBW_SIGNATURE;
+        pcbw->tag = CBW_CMD_READ_TAG;
+        pcbw->txlength = CBW_CMD_READ_TXLENGTH;
+        pcbw->flags = CBW_FLAG_IN;
+        pcbw->lun = CBW_LUN;
+        pcbw->cbwcb_length = CBW_CMD_READ_CMDLEN;
+        cmd_read_cbwcb(pcbw->cbwcb);
 }
 
 
 static void cmd_fill_buf(char *buf, int cmd)
 {
         switch(cmd) {
-                case CMD_NUM_INQUIRY:
+                case CMD_INQUIRY:
                         cmd_inquiry_fill(buf);
                         break;
-                case CMD_NUM_RESET:
+                case CMD_RESET:
                         cmd_reset_fill(buf);
+                        break;
+                case CMD_READ:
+                        cmd_read_fill(buf);
                         break;
         }
 }
@@ -97,10 +135,12 @@ static void cmd_fill_buf(char *buf, int cmd)
 static size_t cmd_get_size(int cmd)
 {
         switch(cmd) {
-                case CMD_NUM_INQUIRY:
+                case CMD_INQUIRY:
                         return CBW_SIZE;
-                case CMD_NUM_RESET:
+                case CMD_RESET:
                         return CMD_SIZE_RESET;
+                case CMD_READ:
+                        return CBW_SIZE;
         }
         return -1;
 }
@@ -402,7 +442,7 @@ static const struct file_operations bulk_storage_fops = {
 };
 
 struct usb_class_driver bulk_storage_class = {
-        .name = "sahci%d",
+        .name = "bulk%d",
         .fops = &bulk_storage_fops,
         .minor_base = MINOR_BASE,
 };

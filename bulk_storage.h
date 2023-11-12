@@ -15,33 +15,46 @@
 #define ESIZE                   1
 #define CSW_BUF_OFFSET          0x500
 
-#define CMD_NUM_INQUIRY         1
-#define CMD_NUM_RESET           2
+#define CMD_INQUIRY		0x1
+#define CMD_RESET		0x2
+#define CMD_READ		0x3
 #define CMD_SIZE_RESET          0x8
 
 #define CBW_SIZE                0x1F
-#define CMD_INQUIRY_CBWCB_SIZE  0x10
+#define CBWCB_MAXSIZE  		0x10
 #define CSW_SIZE                0x0D
 
 #define CBW_SIGNATURE           0x43425355
-#define CBW_CMD_VERIFY_TAG      0
-#define CBW_CMD_VERIFY_DATA     0x60
 #define CBW_FLAG_IN             (1 << 7)
 #define CBW_LUN                 0
-#define CBW_CMD_VERIFY_CMDLEN   0x6
+
+#define CBW_CMD_INQUIRY_TAG     	0
+#define CBW_CMD_INQUIRY_TXLENGTH	0x4C
+#define CBW_CMD_INQUIRY_CMDLEN  	0x6
+
+#define CBW_CMD_READ_TAG	0
+#define CBW_CMD_READ_TXLENGTH	0x1000
+#define CBW_CMD_READ_CMDLEN	0x0A
 
 #define CMD_INQUIRY_OPCODE      0x12
 #define CMD_INQUIRY_CE_ZERO     0
 #define CMD_INQUIRY_PC_ZERO     0
-#define CMD_INQUIRY_AL_H        0x5
-#define CMD_INQUIRY_AL_L        0
-#define CMD_INQUIRY_CONT        0
+#define CMD_INQUIRY_AL_H        0
+#define CMD_INQUIRY_AL_L        0x4C
+#define CMD_INQUIRY_CONTROL     0
 
 #define CMD_RESET_TYPE          0b00100001
 #define CMD_RESET_REQUEST       0b11111111
 #define CMD_RESET_VALUE         0
 #define CMD_RESET_INDEX_IN      (1 << 7)
 #define CMD_RESET_LENGTH        0
+
+#define CMD_READ_OPCODE		0x28
+#define CMD_READ_RDPROTECT	0
+#define CMD_READ_GNUM		0
+#define CMD_READ_TXLENGTH_H	0
+#define CMD_READ_TXLENGTH_L	0x8
+#define CMD_READ_CONTROL	0
 
 struct usb_bulk_storage {
         struct usb_device       *udev;
@@ -67,14 +80,14 @@ struct usb_bulk_storage {
 #define to_usa_dev(d) container_of(d, struct usb_bulk_storage, kref)
 
 struct reset {
-        u8 bmrequest_type;
-        u8 brequest;
-        u16 wvalue;
-        u16 windex;
-        u16 wlength;
+        u8 request_type;
+        u8 request;
+        u16 value;
+        u16 index;
+        u16 length;
 };
 
-struct cbwcb {
+struct cbwcb_inquiry {
         u8 opecode;
         u8 cmddt_evpd;
         u8 page_code;
@@ -83,15 +96,26 @@ struct cbwcb {
         u8 control;
 };
 
+struct cbwcb_read {
+    	u8 opecode;
+	u8 rdprotect;
+	u8 lba_h;
+	u8 lba_m;
+	u8 lba_l;
+	u8 gnum;
+	u8 txlength_h;
+	u8 txlength_l;
+	u8 control;
+};
 
 struct cbw {
-        u32 dcbw_signature;
-        u32 dcbw_tag;
-        u32 dcbw_txlength;
-        u8 bmcbw_flags;
-        u8 bcbw_lun;
-        u8 bcbwcb_length;
-        u8 cbwcb[CMD_INQUIRY_CBWCB_SIZE];
+        u32 signature;
+        u32 tag;
+        u32 txlength;
+        u8 flags;
+        u8 lun;
+        u8 cbwcb_length;
+        u8 cbwcb[CBWCB_MAXSIZE];
 };
 
 
