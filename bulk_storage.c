@@ -16,6 +16,24 @@ u8 lbaseek_l = 0;
 
 char *write_buffer = NULL;
 
+static void lba_increment(void)
+{
+        u32 lbaseek = (lbaseek_h << 24) +
+                      (lbaseek_mh << 16) +
+                      (lbaseek_ml << 8) +
+                      lbaseek_l;
+
+        if (lbaseek == (u32)(0 & 0)) 
+                return;
+
+        lbaseek++;
+
+        lbaseek_h = (u8)(lbaseek >> 24);
+        lbaseek_mh = (u8)(lbaseek >> 16);
+        lbaseek_ml = (u8)(lbaseek >> 8);
+        lbaseek_l = (u8)lbaseek;
+}
+
 static void bulk_storage_delete(struct kref *kref)
 {
         struct usb_bulk_storage *dev = to_usa_dev(kref);
@@ -420,6 +438,8 @@ static ssize_t bulk_storage_read(struct file *file, char *buffer, size_t count,
         retval = bulk_in_rcv(dev, file, buffer, CBW_CMD_READ_TXLENGTH);
         retval = bulk_in_rcv(dev, file, buf_csw, CSW_SIZE);
 
+        lba_increment();
+
         kfree(buf_csw);
 exit:
         return retval;
@@ -464,6 +484,8 @@ static ssize_t bulk_storage_write(struct file *file, const char *user_buffer,
         retval = bulk_out_snd(dev, file, CMD_WRITE);
         retval = bulk_out_snd(dev, file, CMD_SNDDATA);
         retval = bulk_in_rcv(dev, file, buf_csw, CSW_SIZE);
+
+        lba_increment();
 
         kfree(write_buffer);
         kfree(buf_csw);
