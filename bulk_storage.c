@@ -446,13 +446,35 @@ static int bulk_storage_release(struct inode *inode, struct file *file)
         return 0;
 }
 
+static loff_t bulk_storage_llseek(struct file *file, loff_t offset, int whence)
+{
+        struct usb_bulk_storage *dev;
+        u64 offset_sector;
+
+        dev = file->private_data;
+        if (dev == NULL)
+                return -ENODEV;
+
+        offset_sector = offset >> 9;
+
+        if (offset_sector > (1UL << 32))
+                return -ESIZE;
+        
+        lbaseek_h = (u8)(offset_sector >> 24);
+        lbaseek_mh = (u8)(offset_sector >> 16);
+        lbaseek_ml = (u8)(offset_sector >> 8);
+        lbaseek_l = (u8)(offset_sector);
+
+        return offset;
+}
+
 static const struct file_operations bulk_storage_fops = {
         .owner =        THIS_MODULE,
         .read =         bulk_storage_read,
         .write =        bulk_storage_write,
         .open =         bulk_storage_open,
         .release =      bulk_storage_release,
-        .llseek =       noop_llseek,
+        .llseek =       bulk_storage_llseek,
 };
 
 struct usb_class_driver bulk_storage_class = {
