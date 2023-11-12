@@ -11,8 +11,8 @@ int main()
                 return -1;
         }
 
-        buf = malloc(0x1000);
-        fread(buf, 1, 200, fp);
+        buf = malloc(0x1100);
+        fread(buf, 1, 1100, fp);
         fclose(fp);
 
         return 0;
