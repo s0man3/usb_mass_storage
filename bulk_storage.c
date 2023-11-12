@@ -23,7 +23,7 @@ static void lba_increment(void)
                       (lbaseek_ml << 8) +
                       lbaseek_l;
 
-        if (lbaseek == (u32)(0 & 0)) 
+        if (lbaseek == ~(u32)0) 
                 return;
 
         lbaseek++;
