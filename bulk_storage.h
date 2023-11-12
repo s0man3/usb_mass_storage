@@ -7,6 +7,9 @@
 #include <linux/kref.h>
 #include <linux/slab.h>
 
+#define READ_BYTE_SIZE			0x200
+#define SECTOR_SIZE				0x200
+
 #define USB_VENDOR_ID           0x174c
 #define USB_PRODUCT_ID          0x1153
 #define MINOR_BASE              192
@@ -33,7 +36,7 @@
 #define CBW_CMD_INQUIRY_CMDLEN  	0x6
 
 #define CBW_CMD_READ_TAG    	0
-#define CBW_CMD_READ_TXLENGTH	0x200
+#define CBW_CMD_READ_TXLENGTH	READ_BYTE_SIZE
 #define CBW_CMD_READ_CMDLEN 	0x0A
 
 #define CMD_INQUIRY_OPCODE      0x12
@@ -53,7 +56,7 @@
 #define CMD_READ_RDPROTECT	0
 #define CMD_READ_GNUM		0
 #define CMD_READ_TXLENGTH_H	0
-#define CMD_READ_TXLENGTH_L	0x1
+#define CMD_READ_TXLENGTH_L	(READ_BYTE_SIZE / SECTOR_SIZE)
 #define CMD_READ_CONTROL	0
 
 struct usb_bulk_storage {

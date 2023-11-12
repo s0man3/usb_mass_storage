@@ -363,8 +363,7 @@ static ssize_t bulk_storage_read(struct file *file, char *buffer, size_t count,
                 goto exit;
         }
 
-
-        if (count < 0x1000) {
+        if (count < READ_BYTE_SIZE) {
                 pr_info("bulk_storage: too small buffer length: 0x%x", (unsigned int)count);
                 retval = -ESIZE;
                 goto exit;
