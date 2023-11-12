@@ -1,18 +1,27 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 int main()
 {
+        int fd;
         FILE *fp;
         char *buf;
-        fp = fopen("/dev/bulk0", "rb");
-        if(fp == NULL) {
-                printf("Error during open\n");
+
+        buf = malloc(0x1000);
+
+        fd = open("/dev/bulk0", O_RDONLY);
+        if (fd == -1) {
+                printf("error during open\n");
                 return -1;
         }
 
-        buf = malloc(0x1100);
-        fread(buf, 1, 1100, fp);
+        read(fd, buf, 0x1000);
+        close(fd);
+
+        fp = fopen("../log/read_log_v2.bin", "wb");
+        fwrite(buf, 1, 0x1000, fp);
         fclose(fp);
 
         return 0;
